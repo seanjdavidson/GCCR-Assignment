@@ -1,0 +1,631 @@
+
+<!DOCTYPE html>
+<!--
+	Sean Davidson
+	Word Cross HTML Web Application
+-->
+
+<!-- The next several lines contain HTML formatting for tables and buttons-->
+<html lang="en">
+<head>
+<style>
+table,td { 
+	border: 1px solid black;
+	}
+</style>
+</head>
+<body>
+	<center>
+	<h1> Welcome to Drow Syscrow! </h1>
+
+
+	<table id="start">
+		<tr><td id="newgame"><button onclick="NewGame()">New Game</td>
+		</tr>
+	</table>
+<table id="control">
+		<tr>
+		<td id="reset"><button onclick="Shuffle()">Shuffle</td>
+		<td id="placetry"><button onclick="PlaceTry()">Place/Try</td>
+		<td id="delmove"><button onclick="DelMove()">Delete</td>
+	</tr>
+</table>
+
+
+<script>
+
+
+//Data structure for words/locations are arrays of arrays
+var words = [
+	["purple", "pulp", "rue", "pure"],  // game #1
+	["banish", "bash", "nab", "bias"]   // game #2
+];
+	
+//Initialization for Remaining words, which will have words popped as they are placed on board
+RemainingWords = [];
+
+var locations = [
+	["xxxxXxxxxxxXxxxxxxXxxxXXXXXXxXxXxxxxXxXxxxxXxxxxx","2,4,a", "5,1,d", "4,4,d", "2,4,d"],     // game #1
+	["xxxXxxxxxXXXXxXxxXxxxXxxXxxxXXXXxxxxxxXxxxxxxxxxx","4,1,d", "3,2,a", "1,3,d", "1,5,a"]   // game #2
+	]
+
+
+
+	
+
+
+//Initialization for all global variables follows
+//X_Placement: array of first element of locations, showing locations of each X
+//KeyArray is used to store these elements in a Key to check answers
+var X_Placement = "";
+var KeyArray = X_Placement;
+
+//Shuffled string is randomized each time Shuffle() is called
+var ShuffledString = [];
+//Contains a list of element IDS for use with document.GetElementById; only contains ids of filled palette spaces
+var UsedIDS = [];
+
+//Next several lines contain error/alert messages to help the user with the UI
+var InvalidMove = "ERROR: Letter already used.";
+var CantDelete = "ERROR: No moves to delete.";
+var WordNotFound = "Sorry! That word is incorrect.";
+var PleaseNewGame = "Please start a new game to continue playing!";
+
+//UserAns is an array that pushes/pops elements as they are clicked/deleted 
+var UserAns = [];
+var ERROR = "";
+
+//Totalgames is the total number of possible distinct rounds that can be played
+var TotalGames = locations.length;
+//Current game is randomized so that the first game played is chosen randomly
+var CurrentGame;
+CurrentGame = Math.floor(Math.random() * TotalGames);
+
+var FirstElement = 0;
+var FirstRowCol = 1;
+var FinalRowCol = 8;
+var SecondElement = 1;
+var ThirdElement = 2;
+var FinalElement = 6;
+//adds each words to the list of remainingwords, so they can be popped as needed
+for (var i=FirstElement; i<words[CurrentGame].length; i++)
+{
+        RemainingWords[i] = words[CurrentGame][i];
+}
+
+//function NewGame called on NewGame button press
+//Returns nothing
+function NewGame()
+{
+	
+	//Alerts the user that a new game has begun	
+	document.getElementById("ERROR").innerHTML="New game started!";
+	
+	//Temp variable to keep track of game that was just played
+	var PreviousGame = CurrentGame;
+	
+	//while loop that randomizes the game being played unless there is only one game
+	while(CurrentGame == PreviousGame && TotalGames > FirstElement)
+	{
+		CurrentGame = Math.floor(Math.random() * TotalGames);
+	}
+
+	//reset the placement of X's in locations[CurrentGame][0] for the new key
+	X_Placement = locations[CurrentGame][FirstElement].split("");
+
+	//Resets the remainingwords variable
+	for(var i = FirstElement; i < words[CurrentGame].length; i++)
+	{
+		RemainingWords[i] = words[CurrentGame][i];
+	}
+
+	//RefreshTables reloads the game board, anagram, and palette tables
+	RefreshTables();
+	console.log(locations.length);
+	
+}
+
+//Refresh tables reloads the game board, anagram, and palette tables
+//returns nothing
+function RefreshTables()
+{	
+	//calls shuffle, which shuffles ShuffledString (a global variable)
+	Shuffle();
+	console.log(ShuffledString);
+	console.log(X_Placement);
+	
+	//for loop; traverses entire game board (7x7) and resets each element ID to correct value for new game
+	for(var i=FirstRowCol; i<FinalRowCol; i++)
+	{
+		
+		
+		for(var j=FirstRowCol; j<FinalRowCol; j++)
+		{	
+			
+			
+			var Row = i;
+                        var Column = j;
+			//KeyIndex: 7*(Row-1) (as there are 7 spaces per row; subtract 1 because 7(i) must equal zero for row 1), + j-1 (column indeces shifted one to the right) 
+			var KeyIndex = 7*(i-1) + (j-1);
+			
+			//if the index of X_Placement matches 'X' 
+			if(X_Placement[KeyIndex] == 'X')
+			{
+				
+				//change the text of the element to be a red underscore, denoting a letter of a word in the key
+				document.getElementById("R"+Row+"C"+Column).innerHTML = "_";
+				document.getElementById("R"+Row+"C"+Column).style.color="red";
+			}
+			else
+			{
+				//otherwise it is not in the key, thus it should be black
+				document.getElementById("R"+Row+"C"+Column).innerHTML = "_";
+				document.getElementById("R"+Row+"C"+Column).style.color="white";
+			}
+		}
+	}
+}
+
+//Shuffle function
+//Returns the shuffled string 
+function Shuffle()
+{
+	//if the button was pressed but the game has already been completed, prompt the user to begin a new game and leave function
+	if(RemainingWords.length == FirstElement)
+	{
+		document.getElementById("ERROR").innerHTML=PleaseNewGame;
+		return;
+	}
+
+	//otherwise, re-shuffle the string 
+	ShuffledString = InitialAnagram();
+	
+	//Resets palette and anagram tables to be empty and the shuffled string respectively, removing all
+	//elements from the user's answer input by pop()
+	for(var i=FirstElement; i<ShuffledString.length; i++)
+	{
+		document.getElementById("ANA"+i).innerHTML = ShuffledString[i];
+		document.getElementById("ANA"+i).style.color = "black";
+		document.getElementById("PAL"+i).innerHTML = "_";
+		document.getElementById("PAL"+i).style.color="black";
+		UserAns.pop();
+	}
+
+	//next two lines output a message to the user as well as re-setting the first element of the palette to the active selection
+	document.getElementById("PAL0").style.color="red";
+	document.getElementById("ERROR").innerHTML="Letter choices shuffled!";
+
+}
+
+//DelMove() activates on Delete button click
+//Returns nothing; checks if there are elements on the palette and then pops the most recent addition
+function DelMove()
+{
+	//Checks if there is userinput in the palette
+	if(UserAns.length > FirstElement)
+	{
+		
+		var Index = [];
+		
+		//For each element the user has selected in the palette
+		for(var i = FirstElement; i < UserAns.length; i++)
+		{
+			
+			
+			console.log(UsedIDS);
+			//If the current element of Palette is red (signifying it is an active selection) as well as equal to the most recently clicked element
+			if(document.getElementById(UsedIDS[i]).style.color == 'red' && document.getElementById(UsedIDS[i]).innerHTML == UserAns[UserAns.length-1])
+			{
+
+				//set the index equal to the number of the ANAi element
+				Index = UsedIDS[i].split("ANA");
+				//change said element to be black
+				document.getElementById("ANA"+Index[1]).style.color="black";
+				
+				//removes the element from the list of UsedIDS and leaves loop
+				var SpliceIndex = UsedIDS.indexOf("ANA"+Index[1]);
+				UsedIDS.splice(SpliceIndex, 1);
+				break;
+			}
+		}
+		
+		//Sets the previous element of the Palette to be the active choice and makes the deleted element black (_)
+		var NewIn = UserAns.length-1;
+		document.getElementById("PAL"+NewIn).innerHTML="_";
+		
+		document.getElementById("PAL"+NewIn).style.color="red";
+		NewIn++;
+		document.getElementById("PAL"+NewIn).style.color="black";
+		document.getElementById("ERROR").innerHTML=UserAns[UserAns.length-1]+" was deleted!";
+		//pops the most recent user selection
+		UserAns.pop();
+
+	}
+
+	//if there was NO input on the palette
+	else 
+	{
+
+		//alert the user that there are no elements to remove and return
+		ERROR = CantDelete;
+		document.getElementById("ERROR").innerHTML=ERROR;
+		return;
+
+	}
+}
+
+//PlaceMove function
+//Returns nothing
+//when an anagram element is clicked, alerts the user and pushes to UserAns stack
+function PlaceMove(ev)
+{
+	//verifies userin; if the game is over (RemainingWords is empty) prompt the user to start a new game
+	if (this.style.color == "red" && RemainingWords.length == 0)
+	{
+		
+		
+		ERROR = PleaseNewGame;
+		document.getElementById("ERROR").innerHTML=ERROR;
+		return;
+	}
+	//verifies userin; if the user clicks a letter that has already been used, alerts them via message output and returns
+	else if (this.style.color == "red")
+	{
+		ERROR = InvalidMove;
+                document.getElementById("ERROR").innerHTML=ERROR;
+                return;
+
+	}
+
+	//Set the text of the clicked anagram element to Move
+	var Move = this.innerHTML;
+	
+	//change said element's color to red
+	this.style.color = "red";
+	
+	//add the id of said element as well as the text value to their respective stacks for later use
+	UsedIDS.push(this.id);
+
+	UserAns.push(Move);
+
+	//Change the value and style of each affected element to signify the move just made as well as the next active palette space
+	var Index = UserAns.length-1;
+	document.getElementById("PAL"+Index).innerHTML=Move;
+	document.getElementById("PAL"+(Index)).style.color="black";
+	document.getElementById("PAL"+(Index+1)).style.color="red";
+	document.getElementById("ERROR").innerHTML=Move+" was selected! ";
+
+}
+//initialization for the shuffled string for use later
+var Shuffled = [];
+
+//Key function; 
+//returns a string that contains the letter for each marked solution space on the game board
+function Key()
+{
+	console.log("Game: "+CurrentGame);
+
+//for loop: runs for each word in the current game
+for (var h=0; h<words[CurrentGame].length; h++)
+        {
+		//for each h, the word at words[h] is separated by letter to be placed in the loops to follow
+                var Word = words[CurrentGame][h].split("");
+                var WordPlacement = locations[CurrentGame][h+1].split(",");
+
+		//sets the row and column of each word to their respective starting row/column from the locations[] array
+                var WordColumn = parseInt(WordPlacement[FirstElement]);
+                var WordRow = parseInt(WordPlacement[SecondElement]);
+                
+		//if the word exists 'across';
+                if(WordPlacement[2] == 'a')
+                {
+			//for loop: runs for the length of each word and places each letter on the game board column by column
+                        for(var j=FirstElement; j<words[CurrentGame][h].length; j++)
+                        {
+                                Index = 7*(WordRow-1) + WordColumn + (j-1);
+                                KeyArray[Index] = Word[j];
+                        }
+                }
+		//if the word exists 'down'
+                if(WordPlacement[2] == 'd')
+                {
+			//for loop: runs for the length of each word and places each letter on the game board row by row
+                        for(var j=FirstElement; j<words[CurrentGame][h].length; j++)
+                        {
+                                Index = (7*(WordRow-1+j)+(WordColumn)-1);      
+                                KeyArray[Index] = Word[j];
+                        }
+                }
+
+        }
+        console.log(KeyArray);
+	return KeyArray;
+
+}
+
+//InitialAnagram used to randomize letter placement on new game or initial load by player
+function InitialAnagram()
+{
+		
+ 	console.log("Game: "+CurrentGame);
+	//split word into array of letters
+	var Word = words[CurrentGame][FirstElement].split("");
+	
+	//reset shuffled and placementoptions incase previously used in game
+	var Shuffled = [];
+	var PlacementOptions = [];
+	for (var i=FirstElement; i<Word.length; i++)
+	{
+		
+		PlacementOptions[i] = i;
+		Shuffled[i] = "";
+		
+	}
+	
+	//NewPlacement is a string of possible move indeces (0 to length of array)
+	//it is randomized and then a letter from the array of strings is placed at said index
+	for (var j=FirstElement; j<Shuffled.length; j++)
+	{
+		var NewPlacement = Math.floor(Math.random() * PlacementOptions.length);
+				
+		//afterwards, the index must be spliced from palcementoptions so as not to use the same letter twice
+		Shuffled[PlacementOptions[NewPlacement]] = Word[j];
+		PlacementOptions.splice(NewPlacement, 1);
+		
+		
+	}
+
+	//returns shuffled string
+	return Shuffled;
+}
+
+//PlaceTry attempts to find the word on the game board and places it in the correct location if found
+function PlaceTry()
+{
+	//initialize input/index variables
+	var WordInput = "";
+	var WordIndex = 0;
+
+	//for loop; compiles each individual character input by user into one concatenated string
+	for(var i = FirstElement; i < UserAns.length; i++)
+	{
+		WordInput = WordInput + UserAns[i];
+	}
+	console.log("Attempting to place word: " + WordInput);
+
+	//if the word is found in the list of remaining words (IE it hasn't been input yet)
+	if (RemainingWords.includes(WordInput))
+	{
+		//set WordIndex to the index of the word in the data structure provided (words[][])
+		console.log("Word Found");
+		console.log(WordInput);
+		console.log(words[CurrentGame]);	
+		WordIndex = words[CurrentGame].indexOf(WordInput) + 1;
+		console.log(WordIndex);
+
+		//splits wordplacement using the locations[][] structure; this will give us the row/column element to start from
+		var WordPlacement = locations[CurrentGame][WordIndex].split(",");
+		console.log(WordPlacement);	
+		
+		
+		//IF THE WORD SPANS DOWNWARD	
+		if(WordPlacement[ThirdElement] == "d")
+		{
+			//for loop
+			//Starts at first element (char) of WordInput, ends at last element
+			for (var i = FirstElement; i < WordInput.length; i++)
+			{
+				//Row variable increments Row each iteration so as to place each successive element downward
+				var Row = parseInt(WordPlacement[1]) + i;
+
+				console.log("R"+(Row)+"C"+WordPlacement[FirstElement]);
+				var Index = WordInput.length - i;
+
+				//change the element's text and color to signify the move made
+				document.getElementById("R"+(Row)+"C"+WordPlacement[FirstElement]).innerHTML=WordInput[i];
+				document.getElementById("PAL"+Index).style.color="black";
+				//deletes each element after placing; prevenets the user from manually having to clear palette after each submission
+				DelMove();
+				
+			}
+			//reset the first element of the palette to the active selection for future word submissions
+			document.getElementById("PAL0").innerHTML="_";
+			document.getElementById("PAL0").style.color="red";
+		}
+
+		//else only triggers for words that are across
+		else
+		{	
+			//for loop
+			//starts at first element (char) of wordinput, ends at final element
+			for (var i = FirstElement; i < WordInput.length; i++)
+			{
+				//Column var increments column each iteration so as to place each letter horizontally
+				var Column = parseInt(WordPlacement[FirstElement]) + i;
+				document.getElementById("R"+WordPlacement[1]+"C"+Column).innerHTML=WordInput[i];
+				console.log("R"+WordPlacement[SecondElement]+"C"+Column);
+				
+				//deletes each element after placing; prevenets the user from manually having to clear palette after each submission
+				DelMove();
+				
+
+			}
+			//reset the first element of the palette to the active selection for future word submissions
+			document.getElementById("PAL0").innerHTML="_";
+			document.getElementById("PAL0").style.color="red";
+
+		}
+
+		//new few lines execute only after word was placed on board
+		//removed the word from the list of remaining words so as not to place it again in the future
+		Index = RemainingWords.indexOf(WordInput);
+		RemainingWords.splice(Index, 1);
+		console.log(RemainingWords);
+		//alerts the user via message that the word was placed
+		document.getElementById("ERROR").innerHTML=WordInput+" was placed on the game board! ";
+	}
+	//occurs when the word attempted to place but wasn't found in dictionary
+	else
+	{
+		//if the word was not found, alert the user via error message
+		console.log("Word Not Found");
+		ERROR = WordNotFound;
+		document.getElementById("ERROR").innerHTML=ERROR;
+		console.log(RemainingWords);
+	}
+
+	//if all words have already been placed on the board, alert the user that they have won and can
+	//press the new game button to start a new round
+	if(RemainingWords.length==0)
+	{	
+		document.getElementById("ERROR").innerHTML="You win! Press new game for a fresh round.";
+		//sets all elements of the anagram to red so they can not be used to keep playing after the game ends
+		for(var i=FirstElement; i<ShuffledString.length; i++)
+		{
+			document.getElementById("ANA"+i).style.color="red";
+		}
+		console.log("YOU WIN!");
+	}
+}
+
+//LoadBoard function; returns nothing
+//starts on load
+//initializes all table elements to be used throughout game
+function LoadBoard()
+{
+	//initialize the total number of playable games 
+	TotalGames = locations.length;
+        
+	//initialize X_Placement, which contains the placement for all 7x7 table elements
+        X_Placement = locations[CurrentGame][FirstElement].split("");
+	console.log("Game: "+CurrentGame);
+
+	//alert the user via message that a new game has begun
+	document.getElementById("ERROR").innerHTML="New game started!";
+        console.log(CurrentGame);
+        console.log(locations);
+        console.log(locations[FirstElement][SecondElement]);
+        console.log(locations.length);
+
+
+	//for loop: spans all elements of anagram table. initializes and makes each element clickable. 
+	for (var i=FirstElement; i<FinalElement; i++)
+	{
+		
+		document.getElementById("ANA"+i).addEventListener("click", PlaceMove, true);
+		
+	}
+	
+}
+
+</script>			  
+
+	<!-- runs LoadBoard() script on startup-->
+<body onload="LoadBoard();">
+
+
+	<script>
+		//initializes shuffled string and X_Placement on startup
+	ShuffledString = InitialAnagram();
+		
+	X_Placement = locations[CurrentGame][FirstElement];
+	
+	document.write("<table id='pieces' style='border: 2px solid black'><tr>");
+	
+	
+	
+		
+	//nested for loop; traverses entirety of 7x7 gameboard to initialize each element
+	//row = i, column = j
+	for (var i=FirstRowCol; i<FinalRowCol; i++)
+	{		
+		for (var j=FirstRowCol; j<FinalRowCol; j++)
+		{	
+			//IF RiCj == 'X', set the element on the board to _ and make them red
+      			var Index = 7*(i-1)+j-1;
+			if (X_Placement[Index] == 'X')
+				
+				{
+		
+					document.write("<td id='R"+i+"C"+j+"'>_</td>");
+					document.getElementById("R"+i+"C"+j).style.color="red";
+
+					
+				}
+
+			//Else, set it to an empty white space
+			else
+			{
+				document.write("<td id='R"+i+"C"+j+"'>_</td>");
+				document.getElementById("R"+i+"C"+j).style.color="white";
+			}	
+		
+
+		}
+		document.write("</tr><tr>");
+	}
+	//initializes the answer key for future comparisons
+	BoardKey = Key();
+	
+	
+	
+
+		
+</script>
+</tr>
+</table>
+
+<table id='anagram' style='border: 2px solid black'>
+<tr>
+
+	<script>
+	//Prints each table element of the anagram, where each individual element is of the ShuffledString array
+	for (var i=FirstElement; i<FinalElement; i++)
+	{
+		
+		document.write("<td id='ANA"+i+"'>"+ShuffledString[i]+"</td>");
+
+	}
+
+	
+	</script>
+	
+</tr>
+</table>
+
+
+<table id='palette' style='border: 2px solid black'>
+<tr>
+
+        <script>
+	var LastElement = 7;
+	//Prints each table element of the palette; this is initialized as black underscores
+        for (var i=FirstElement; i<LastElement; i++)
+        {
+
+                document.write("<td id='PAL"+i+"'>_</td>");
+
+        }
+	//makes the first element red to signify the initial active selection for the user
+	document.getElementById("PAL0").style.color="red";
+
+        </script>
+
+</tr>
+</table>
+
+<table id='error' style='border: 2px solid black'>
+	<tr>
+	<script>
+		//This single table element is used simply to display error messages or alerts to the screen
+		//to assist the user with the game and UI
+		document.write("<td id='ERROR'>"+ERROR+"</td>");
+	</script>
+	</tr>
+</table>
+
+
+</center>
+</body>
+</html>
+		
